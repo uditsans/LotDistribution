@@ -70,6 +70,11 @@ class PDFCreatorApp:
             self.party = [row[0] for row in self.cursor.execute("SELECT DISTINCT(party) FROM sales").fetchall()]
             self.party_combobox['values'] = self.party
 
+            self.total_bags.config(state='normal')
+            self.total_bags.delete(0, tk.END)
+            self.total_bags.insert(0, '-')
+            self.total_bags.config(state='readonly')
+
         except sqlite3.Error as e:
             messagebox.showerror("Database Error", f"Error connecting to database: {e}")
 
@@ -84,11 +89,17 @@ class PDFCreatorApp:
             for item in self.tree_sales.get_children():
                 self.tree_sales.delete(item)
 
-            query = "SELECT LotNo, InvNo, Mark, Grade, Qty, PkgWt, PriceKg FROM sales WHERE Party=?"
+            query = "SELECT LotNo, InvNo, Mark, Grade, Qty, PkgWt, PriceKg FROM sales WHERE Party=? ORDER BY LotNo"
             sales = self.cursor.execute(query, (party,)).fetchall()
 
             for sale in sales:
                 self.tree_sales.insert("", "end", values=sale)
+
+            self.total_bags.config(state='normal')
+            self.total_bags.delete(0, tk.END)
+            self.total_bags.insert(0, self.cursor.execute("SELECT SUM(Qty) FROM sales WHERE Party=?", (party,)).fetchone()[0])
+            self.total_bags.config(state='readonly')
+
         except sqlite3.Error as e:
             messagebox.showerror("Database Error", f"Error retrieving sales data: {e}")
 
@@ -101,13 +112,18 @@ class PDFCreatorApp:
         self.sale_combobox = ttk.Combobox(heading_frame, state="readonly", width=12)
         self.sale_combobox['values'] = self.sale_nos
         if self.sale_nos:
-            self.sale_combobox.current(min(len(self.sale_nos) - 1,0))
+            self.sale_combobox.current(max(len(self.sale_nos) - 1,0))
         self.sale_combobox.pack(side=tk.LEFT, padx=5)
         self.sale_combobox.bind("<<ComboboxSelected>>", self.update_db_selection)
 
         tk.Label(heading_frame, text="Party:").pack(side=tk.LEFT)
         self.party_combobox = ttk.Combobox(heading_frame, width=15)
         self.party_combobox.pack(side=tk.LEFT, padx=5)
+        
+        tk.Label(heading_frame, text=f"Total Bags:").pack(side=tk.LEFT)
+        self.total_bags = ttk.Entry(heading_frame, width=15, state='readonly')
+        self.total_bags.pack(side=tk.LEFT)
+        
         self.update_db_selection()
 
         preview_button = ttk.Button(heading_frame, text="Preview", command=self.display_sales_data)
@@ -139,7 +155,7 @@ class PDFCreatorApp:
                 address = cursor.execute(f"SELECT address FROM party WHERE code='{party}'").fetchone()[0]
                 sale_info = cursor.execute(f"SELECT * FROM sales WHERE sale_number='{self.sale_combobox.get()}'").fetchone()
 
-            doc = SimpleDocTemplate(filepath, pagesize=(612, 792), topMargin=0.5 * inch, bottomMargin=0.5 * inch)
+            doc = SimpleDocTemplate(filepath, pagesize=(595, 842), topMargin=0.5 * inch, bottomMargin=0.5 * inch)
             styles = getSampleStyleSheet()
 
             heading_style = styles['Heading1']
@@ -172,7 +188,7 @@ class PDFCreatorApp:
             story.append(Spacer(1, 0.1 * inch))
 
             try:
-                query = "SELECT LotNo, InvNo, Mark, Grade, Qty, PkgWt, PriceKg FROM sales WHERE Party=?"
+                query = "SELECT LotNo, InvNo, Mark, Grade, Qty, PkgWt, PriceKg FROM sales WHERE Party=? ORDER BY LotNo"
                 sales = self.cursor.execute(query, (party,)).fetchall()
 
                 table_data = [self.columns] + [[row[i] if i <= 3 else int(row[i]) for i in range(len(row))] for row in sales]

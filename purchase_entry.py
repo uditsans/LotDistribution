@@ -54,6 +54,7 @@ class PurchaseApp:
                     id INTEGER PRIMARY KEY,
                     BuyerCode TEXT,
                     LotNo TEXT,
+                    Category TEXT,
                     InvNo TEXT,
                     Mark TEXT,
                     Grade TEXT,
@@ -107,8 +108,20 @@ class PurchaseApp:
             "BuyerCode", "LotNo", "InvNo", "Mark", "Grade", "Qty", "PkgWt", "TotalWt", "PriceKg"), show="headings")
         for col in ("BuyerCode", "LotNo", "InvNo", "Mark", "Grade", "Qty", "PkgWt", "TotalWt", "PriceKg"):
             self.tree_buyer.heading(col, text=col)
-            self.tree_buyer.column(col, width=int(1000/9))
+            self.tree_buyer.column(col, anchor=tk.CENTER, width=int(1000/9))
         self.tree_buyer.pack(fill='both', expand=True)
+
+        frame_buyer_summary = tk.LabelFrame(upload_frame, text="Purchase Summary")
+        frame_buyer_summary.pack(fill='both', expand=True)
+        self.frame_buyer_summary = frame_buyer_summary
+
+
+        self.tree_buyer_summary = ttk.Treeview(frame_buyer_summary, columns=(
+            "BuyerCode", "Qty", "Kgs"), show="headings")
+        for col in ("BuyerCode", "Qty", "Kgs"):
+            self.tree_buyer_summary.heading(col, text=col)
+            self.tree_buyer_summary.column(col, anchor=tk.CENTER, width=int(1000/3))
+        self.tree_buyer_summary.pack(fill='both', expand=True)
 
     def refresh_purchases_list(self):
         """
@@ -116,16 +129,26 @@ class PurchaseApp:
         """
         for item in self.tree_buyer.get_children():
             self.tree_buyer.delete(item)
+        
+        for item in self.tree_buyer_summary.get_children():
+            self.tree_buyer_summary.delete(item)
 
         try:
-            self.cursor.execute("SELECT BuyerCode, LotNo, InvNo, Mark, Grade, BoughtQty, PkgWt, TotalWt, PriceKg FROM purchases")
+            self.cursor.execute("SELECT Category, BuyerCode, LotNo, InvNo, Mark, Grade, BoughtQty, PkgWt, TotalWt, PriceKg FROM purchases ORDER BY Category, LotNo")
             purchases = self.cursor.fetchall()
             for purchase in purchases:
                 # Display BoughtQty as Qty in the treeview
-                self.tree_buyer.insert("", "end", values=purchase)
+                self.tree_buyer.insert("", "end", values=purchase[1:])
+
+            buyer_codes = set(self.cursor.execute("SELECT DISTINCT(BuyerCode) FROM purchases").fetchall())
+
+            for buyer in buyer_codes:
+                self.tree_buyer_summary.insert("", "end", values=[buyer,
+                    self.cursor.execute("SELECT SUM(BoughtQty) FROM purchases WHERE BuyerCode=?", buyer).fetchone()[0],
+                    self.cursor.execute("SELECT SUM(TotalWt) FROM purchases WHERE BuyerCode=?", buyer).fetchone()[0]])
+
         except sqlite3.Error as e:
             messagebox.showerror("Database Error", f"Error fetching purchases: {e}")
-
 
     def add_file(self):
         """
@@ -152,9 +175,9 @@ class PurchaseApp:
                             else:
                                 # LotNo doesn't exist, insert the new record
                                 self.cursor.execute("""
-                                    INSERT INTO purchases (BuyerCode, LotNo, InvNo, Mark, Grade, Qty, PkgWt, TotalWt, PriceKg, BoughtQty)
-                                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                                """, tuple(list(row) + [list(row)[5]]))
+                                    INSERT INTO purchases (BuyerCode, LotNo, InvNo, Mark, Grade, Qty, PkgWt, TotalWt, PriceKg, BoughtQty, Category)
+                                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                                """, tuple(list(row) + [list(row)[5], "Dust" if row[0].rsplit("-",1)[1]=="SD" else "Leaf"]))
                         except sqlite3.Error as e:
                             messagebox.showerror("Database Error", f"Error inserting record for LotNo {row['LotNo']}: {e}")
                             continue  # Skip the rest of the loop for this row.

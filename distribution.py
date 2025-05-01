@@ -8,9 +8,14 @@ inventory.
 """
 
 import tkinter as tk
-from tkinter import messagebox, ttk
+from tkinter import ttk, filedialog, messagebox
 import sqlite3
 import os
+
+from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Spacer
+from reportlab.lib import colors
+from reportlab.lib.enums import TA_CENTER
+from reportlab.lib.units import inch
 
 class DistributionApp:
     def __init__(self, root):
@@ -26,7 +31,6 @@ class DistributionApp:
         self.constants_cursor = self.constants_conn.cursor()
         self.sale_nos = [row[0] for row in self.constants_cursor.execute("SELECT sale_number FROM sales").fetchall()]
         self.party = [row[0] for row in self.constants_cursor.execute("SELECT code FROM party").fetchall()]
-        self.constants_conn.close()
 
         self.columns = ["LotNo", "InvNo", "Mark", "Grade", "Qty", "PkgWt", "PriceKg"]
 
@@ -53,6 +57,7 @@ class DistributionApp:
                 CREATE TABLE IF NOT EXISTS sales (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     LotNo TEXT,
+                    Category TEXT,
                     InvNo TEXT,
                     Mark TEXT,
                     Grade TEXT,
@@ -90,7 +95,7 @@ class DistributionApp:
                                             show="headings")
         for col in self.columns:
             self.tree_purchases.heading(col, text=col)
-            self.tree_purchases.column(col, width=int(1200/7))
+            self.tree_purchases.column(col, anchor=tk.CENTER, width=int(1200/len(self.columns)))
         self.tree_purchases.pack(fill='both', expand=True)
         self.tree_purchases.bind("<<TreeviewSelect>>", self.show_lot_info)
 
@@ -130,14 +135,17 @@ class DistributionApp:
         self.tree_sales = ttk.Treeview(sales_frame, columns=self.columns + ["Party"], show="headings")
         for col in self.columns + ["Party"]:
             self.tree_sales.heading(col, text=col)
-            self.tree_sales.column(col, width=int(1200/8))
+            self.tree_sales.column(col, anchor=tk.CENTER, width=int(1200/8))
         self.tree_sales.pack(fill='both', expand=True)
 
-        delete_revert_frame = tk.Frame(self.root)
-        delete_revert_frame.pack(pady=5, padx=10, fill='x')
+        sales_functions_frame = tk.Frame(self.root)
+        sales_functions_frame.pack(pady=5, padx=10, fill='x')
 
-        button_delete_revert = tk.Button(delete_revert_frame, text="Delete Sales & Revert Purchase", command=self.delete_sales_revert_purchase)
-        button_delete_revert.pack(side=tk.LEFT)
+        button_delete_revert = tk.Button(sales_functions_frame, text="Delete Sales & Revert Purchase", command=self.delete_sales_revert_purchase)
+        button_delete_revert.pack(pady=5, padx=10, side=tk.LEFT)
+
+        full_sale_pdf_button = tk.Button(sales_functions_frame, text="Create Full Purchase List PDF", command=self.create_and_save_pdf)
+        full_sale_pdf_button.pack(pady=5, padx=10, side=tk.LEFT)
 
     def refresh_purchases_list(self):
         """
@@ -147,10 +155,10 @@ class DistributionApp:
             self.tree_purchases.delete(item)
 
         try:
-            self.cursor.execute("SELECT LotNo, InvNo, Mark, Grade, Qty, PkgWt, PriceKg FROM purchases WHERE Qty>0")
+            self.cursor.execute("SELECT Category, LotNo, InvNo, Mark, Grade, Qty, PkgWt, PriceKg FROM purchases WHERE Qty>0 ORDER BY Category, LotNo")
             purchases = self.cursor.fetchall()
             for purchase in purchases:
-                self.tree_purchases.insert("", "end", values=purchase)
+                self.tree_purchases.insert("", "end", values=purchase[1:])
         except sqlite3.Error as e:
             messagebox.showerror("Database Error", f"Error fetching purchases: {e}")
 
@@ -162,10 +170,10 @@ class DistributionApp:
             self.tree_sales.delete(item)
 
         try:
-            self.cursor.execute("SELECT LotNo, InvNo, Mark, Grade, Qty, PkgWt, PriceKg, Party FROM sales")
+            self.cursor.execute("SELECT Category, LotNo, InvNo, Mark, Grade, Qty, PkgWt, PriceKg, Party FROM sales ORDER BY Category, LotNo")
             sales = self.cursor.fetchall()
             for sale in sales:
-                self.tree_sales.insert("", "end", values=sale)
+                self.tree_sales.insert("", "end", values=sale[1:])
         except sqlite3.Error as e:
             messagebox.showerror("Database Error", f"Error fetching sales: {e}")
 
@@ -227,19 +235,20 @@ class DistributionApp:
             return
 
         try:
-            self.cursor.execute("SELECT Qty FROM purchases WHERE LotNo=? AND InvNo=? AND Mark=? AND Grade=? AND PkgWt=? AND PriceKg=?",
+            self.cursor.execute("SELECT Qty, Category FROM purchases WHERE LotNo=? AND InvNo=? AND Mark=? AND Grade=? AND PkgWt=? AND PriceKg=?",
                                 (LotNo, InvNo, Mark, Grade, PkgWt, PriceKg))
             purchase_record = self.cursor.fetchone()
             if purchase_record:
                 remaining_qty = purchase_record[0]
+                category = purchase_record[1]
                 if qty > remaining_qty:
                     messagebox.showerror("Error", "Quantity exceeds available stock.")
                     return
 
                 self.cursor.execute("""
-                    INSERT INTO sales (LotNo, InvNo, Mark, Grade, Qty, PkgWt, PriceKg, Party)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-                """, (LotNo, InvNo, Mark, Grade, qty, PkgWt, PriceKg, party))
+                    INSERT INTO sales (LotNo, InvNo, Mark, Grade, Qty, PkgWt, PriceKg, Party, Category)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """, (LotNo, InvNo, Mark, Grade, qty, PkgWt, PriceKg, party, category))
 
                 new_qty = remaining_qty - qty
                 self.cursor.execute("UPDATE purchases SET Qty = ? WHERE LotNo=? AND InvNo=? AND Mark=? AND Grade=? AND PkgWt=? AND PriceKg=?",
@@ -249,7 +258,6 @@ class DistributionApp:
                 self.refresh_purchases_list()
                 self.refresh_qty_list()
                 self.refresh_sales_list()
-                messagebox.showinfo("Success", "Items distributed successfully.")
             else:
                 messagebox.showerror("Error", "Purchase record not found.")
 
@@ -301,6 +309,104 @@ class DistributionApp:
         except sqlite3.Error as e:
             messagebox.showerror("Database Error", f"An error occurred: {e}")
             self.conn.rollback()
+
+    def generate_pdf(self, filepath="temp_preview.pdf"):
+        """Generates a PDF document with sales data."""
+
+        try:
+            sale_info = self.constants_cursor.execute(f"SELECT * FROM sales WHERE sale_number='{self.sale_no_entry.get()}'").fetchone()
+
+            doc = SimpleDocTemplate(filepath, pagesize=(595, 842), topMargin=0.5 * inch, bottomMargin=0.5 * inch)
+
+            story = []
+
+            if sale_info:
+                sale_info_table = Table([f"Sale No: {sale_info[0]}\t\tSale Dt: {sale_info[1]}\t\tPrompt Dt: {sale_info[2]}".split("\t")])
+                sale_info_table.hAlign = 'CENTER'
+                sale_info_table.setStyle(TableStyle([('BACKGROUND', (0, 0), (-1, 0), colors.white),
+                                                        ('TEXTCOLOR', (0, 0), (-1, 0), colors.black),
+                                                        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+                                                        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                                                        ('FONTSIZE', (0, 0), (-1, 0), 12), # For header in table
+                                                        ('BOTTOMPADDING', (0, 0), (-1, 0), 0),
+                                                        ('BACKGROUND', (0, 1), (-1, -1), colors.white),
+                                                        ('GRID', (0, 0), (-1, -1), 1, colors.white)]))
+                story.append(sale_info_table)
+            story.append(Spacer(1, 0.1 * inch))
+
+            try:
+                table_data = [self.columns+[" "*5]*6]
+                buyer_codes = set(self.cursor.execute("SELECT DISTINCT(BuyerCode) FROM purchases").fetchall())
+
+                for buyer in buyer_codes:                
+                    query = "SELECT LotNo, InvNo, Mark, Grade, Qty, PkgWt, PriceKg FROM purchases WHERE BuyerCode=? ORDER BY LotNo"
+                    sales = self.cursor.execute(query, buyer).fetchall()
+                    table_data = table_data + [["-"]*2 + [buyer[0]] + ["-"]*4]
+                    table_data = table_data + [[row[i] if i<=3 else int(row[i]) for i in range(len(row))] for row in sales]
+                
+                if len(table_data) <= 1:
+                    messagebox.showinfo("Info", "No data found in table")
+                    return False
+
+                table = Table(table_data)
+                table.hAlign = 'CENTER'
+                table.setStyle(TableStyle([('BACKGROUND', (0, 0), (-1, 0), colors.grey),
+                                                        ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+                                                        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+                                                        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                                                        ('BOTTOMPADDING', (0, 0), (-1, 0), 0),
+                                                        ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
+                                                        ('GRID', (0, 0), (-1, -1), 1, colors.black)]))
+                story.append(table)
+                story.append(Spacer(1, 0.1 * inch))
+
+                tot_bags = self.cursor.execute('SELECT SUM(BoughtQty) FROM purchases').fetchone()[0]
+                leaf_bags = self.cursor.execute('SELECT SUM(BoughtQty) FROM purchases WHERE Category=?',(['Leaf'])).fetchone()[0]
+                dust_bags = self.cursor.execute('SELECT SUM(BoughtQty) FROM purchases WHERE Category=?',(['Dust'])).fetchone()[0]
+                                            
+
+                bags_info_table = Table([f"Total Bags: {tot_bags}\t\tLeaf Bags: {leaf_bags}\t\tDust Bags: {dust_bags}\t\t".split("\t")])
+                bags_info_table.hAlign = 'CENTER'
+                bags_info_table.setStyle(TableStyle([('BACKGROUND', (0, 0), (-1, 0), colors.white),
+                                                        ('TEXTCOLOR', (0, 0), (-1, 0), colors.black),
+                                                        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+                                                        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                                                        ('BOTTOMPADDING', (0, 0), (-1, 0), 0),
+                                                        ('BACKGROUND', (0, 1), (-1, -1), colors.white),
+                                                        ('GRID', (0, 0), (-1, -1), 1, colors.white)]))
+                
+                story.append(bags_info_table)
+                story.append(Spacer(1, 0.1 * inch))
+
+
+                # total_bags = sum(row[4] for row in sales)
+                # story.append(Paragraph(f"Total Bags: {total_bags}", normal_style))
+                doc.build(story)
+                return True
+
+            except sqlite3.Error as e:
+                messagebox.showerror("Database Error", f"Error retrieving purchase table data: {e}")
+                return False
+
+        except sqlite3.Error as e:
+            messagebox.showerror("Database Error", f"Error during PDF generation: {e}")
+            return False
+        except Exception as e:
+            messagebox.showerror("Error", f"An unexpected error occurred: {e}")
+            return False
+
+    def create_and_save_pdf(self):
+        """Creates and saves the PDF file."""
+        try:
+            filepath = filedialog.asksaveasfilename(
+                defaultextension=".pdf",
+                filetypes=[("PDF files", "*.pdf")]
+            )
+            if filepath:
+                if self.generate_pdf(filepath):
+                    messagebox.showinfo("Success", f"PDF created successfully at: {filepath}")
+        except Exception as file_err:
+            messagebox.showerror("File Error", f"Error saving PDF: {file_err}")
 
     def on_closing(self):
         """
