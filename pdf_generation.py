@@ -22,6 +22,8 @@ from reportlab.lib import colors
 from reportlab.lib.enums import TA_CENTER
 from reportlab.lib.units import inch
 
+import xlsxwriter
+
 
 class PDFCreatorApp:
     def __init__(self, root):
@@ -141,6 +143,9 @@ class PDFCreatorApp:
         create_pdf_button = ttk.Button(heading_frame, text="Create and Save PDF", command=self.create_and_save_pdf)
         create_pdf_button.pack(side="left", padx=10)
 
+        create_label_button = ttk.Button(heading_frame, text="Create and Save Labels", command=self.create_and_save_label)
+        create_label_button.pack(side="left", padx=10)
+
     def generate_pdf(self, filepath="temp_preview.pdf"):
         """Generates a PDF document with sales data."""
         party = self.party_combobox.get()
@@ -237,6 +242,82 @@ class PDFCreatorApp:
             if filepath:
                 if self.generate_pdf(filepath):
                     messagebox.showinfo("Success", f"PDF created successfully at: {filepath}")
+        except Exception as file_err:
+            messagebox.showerror("File Error", f"Error saving PDF: {file_err}")
+
+    def create_and_save_label(self):
+        """Creates and saves the PDF file."""
+        try:
+            party = self.party_combobox.get()
+            if not party:
+                messagebox.showerror("Input Error", "Please select a Party.")
+                return False
+                
+            save_path = filedialog.asksaveasfilename(defaultextension=".xlsx")
+            if save_path:
+                workbook = xlsxwriter.Workbook(save_path)
+                worksheet = workbook.add_worksheet()
+
+                # Define some formats
+                bold = workbook.add_format({'bold': True, 'valign': 'vcenter'})
+                center = workbook.add_format({'valign': 'vcenter'})
+
+                # Set column widths to match the visual spacing in the image (optional but helpful)
+                worksheet.set_column('A:A', 2)   # Narrow column for the left margin
+                worksheet.set_column('B:B', 9.5)  # Column B
+                worksheet.set_column('C:C', 10)  # Column C
+                worksheet.set_column('D:D', 3.3)   # Narrow column for the left margin
+                worksheet.set_column('E:E', 9.5)  # Column E
+                worksheet.set_column('F:F', 10)  # Column F
+                worksheet.set_column('G:G', 3.3)   # Narrow column for the left margin
+                worksheet.set_column('H:H', 9.5)  # Column H
+                worksheet.set_column('I:I', 10)  # Column I
+                worksheet.set_column('J:J', 3.3)   # Narrow column for the left margin
+                worksheet.set_column('K:K', 9.5)  # Column K
+                worksheet.set_column('L:L', 10)  # Column L
+                    
+                query = "SELECT LotNo, InvNo, Mark, Grade, Qty, PkgWt, PriceKg FROM sales WHERE Party=? ORDER BY LotNo"
+                temp_df = self.cursor.execute(query, (party,)).fetchall()
+                print(temp_df)
+                temp_df.sort(key = lambda x: x[0])
+
+                for i in range(70*(1+(len(temp_df)//56))):
+                    if i%5==0:
+                        if i%70==0:
+                            worksheet.set_row(i, 6)
+                        else:
+                            worksheet.set_row(i, 16.25)
+                    else:
+                        worksheet.set_row(i, 11)
+
+                k = 2
+                char='B'
+                for i in range(len(temp_df)):
+                    a = temp_df[i]
+                    worksheet.write(f'{char}{k}', f"  S/{self.sale_combobox.get()}", center)
+                    worksheet.write(f'{chr(ord(char)+1)}{k}', f"  {party}", 
+                                    workbook.add_format({'align': 'right', 'valign': 'vcenter', 'font_size': 6}))
+                    worksheet.write(f'{char}{k+1}', f"  {a[0][:2]} {a[0][2:]}", bold)
+                    worksheet.write(f'{chr(ord(char)+1)}{k+1}', f"{a[1]}", center)
+                    worksheet.write(f'{char}{k+2}', f"  {a[2]}", bold)
+                    worksheet.write(f'{char}{k+3}',  f"  {a[3]}", center)
+                    worksheet.write(f'{chr(ord(char)+1)}{k+3}', f"{a[4]} X {a[5]}", center)
+
+                    if i%4==3:
+                        k+=5
+                        char = 'B'
+                    else:
+                        char = chr(ord(char)+3)
+                    
+                worksheet.set_portrait()
+                worksheet.set_paper(9)
+                worksheet.set_page_view()
+                worksheet.set_margins(left=0, right=0, top=0, bottom=0)
+                worksheet.set_header('', {'margin': 0})
+                worksheet.set_footer('', {'margin': 0})
+
+                workbook.close()
+                return
         except Exception as file_err:
             messagebox.showerror("File Error", f"Error saving PDF: {file_err}")
 

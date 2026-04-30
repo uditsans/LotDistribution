@@ -327,7 +327,7 @@ class DistributionApp:
                                                         ('TEXTCOLOR', (0, 0), (-1, 0), colors.black),
                                                         ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
                                                         ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-                                                        ('FONTSIZE', (0, 0), (-1, 0), 12), # For header in table
+                                                        ('FONTSIZE', (0, 0), (-1, 0), 11), # For header in table
                                                         ('BOTTOMPADDING', (0, 0), (-1, 0), 0),
                                                         ('BACKGROUND', (0, 1), (-1, -1), colors.white),
                                                         ('GRID', (0, 0), (-1, -1), 1, colors.white)]))
@@ -335,14 +335,15 @@ class DistributionApp:
             story.append(Spacer(1, 0.1 * inch))
 
             try:
-                table_data = [self.columns+[" "*5]*6]
-                buyer_codes = set(self.cursor.execute("SELECT DISTINCT(BuyerCode) FROM purchases").fetchall())
+                table_data = [["LotNo", "InvNo", "Mark", "Grade", "Qty", "Wt", "TotWt", "Rate"]+[" "*4]*9]
+                for grade in ["Leaf", "Dust"]:
+                    buyer_codes = set(self.cursor.execute(f"SELECT DISTINCT(BuyerCode) FROM purchases WHERE Category='{grade}'").fetchall())
 
-                for buyer in buyer_codes:                
-                    query = "SELECT LotNo, InvNo, Mark, Grade, Qty, PkgWt, PriceKg FROM purchases WHERE BuyerCode=? ORDER BY LotNo"
-                    sales = self.cursor.execute(query, buyer).fetchall()
-                    table_data = table_data + [["-"]*2 + [buyer[0]] + ["-"]*4]
-                    table_data = table_data + [[row[i] if i<=3 else int(row[i]) for i in range(len(row))] for row in sales]
+                    for buyer in buyer_codes:                
+                        query = "SELECT LotNo, InvNo, Mark, Grade, BoughtQty, PkgWt, TotalWt, PriceKg FROM purchases WHERE BuyerCode=? ORDER BY LotNo"
+                        sales = self.cursor.execute(query, buyer).fetchall()
+                        table_data = table_data + [["-"]*2 + [buyer[0]] + ["-"]*5]
+                        table_data = table_data + [[row[i][:15] if i==2 else row[i] if i!=1 else row[i][0:6] if i<=3 or i==6 else int(row[i]) for i in range(len(row))] for row in sales]
                 
                 if len(table_data) <= 1:
                     messagebox.showinfo("Info", "No data found in table")
@@ -354,6 +355,7 @@ class DistributionApp:
                                                         ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
                                                         ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
                                                         ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                                                        ('FONTSIZE', (0, 0), (-1, 0), 9),
                                                         ('BOTTOMPADDING', (0, 0), (-1, 0), 0),
                                                         ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
                                                         ('GRID', (0, 0), (-1, -1), 1, colors.black)]))

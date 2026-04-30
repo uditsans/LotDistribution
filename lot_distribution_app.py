@@ -8,33 +8,33 @@ distribution, and PDF generation functionalities.
 
 import tkinter as tk
 
-from sale_entry import SalesApp
+from sale_info_entry import SaleInfoApp
 from party_entry import PartyApp
 from purchase_entry import PurchaseApp
 from distribution import DistributionApp
 from pdf_generation import PDFCreatorApp
 
-def show_sales():
+def add_sales_info():
     """Displays the sales entry window."""
     menu()
-    SalesApp(root)
+    SaleInfoApp(root)
 
 def show_party():
     """Displays the party entry window."""
     menu()
     PartyApp(root)
 
-def show_purchase():
+def add_purchase():
     """Displays the purchase entry window."""
     menu()
     PurchaseApp(root)
 
-def show_distribution():
+def do_distribution():
     """Displays the distribution window."""
     menu()
     DistributionApp(root)
 
-def pdf_generate():
+def party_sales():
     """Displays the PDF generation window."""
     menu()
     PDFCreatorApp(root)
@@ -49,23 +49,28 @@ def menu():
     menu_bar = tk.Menu(root)
     root.config(menu=menu_bar)
 
-    # Create Entry Menu
-    entry_menu = tk.Menu(menu_bar, tearoff=0)
-    menu_bar.add_cascade(label="Entry", menu=entry_menu)
+    # Create Purchase Menu
+    purchase_menu = tk.Menu(menu_bar, tearoff=0)
+    menu_bar.add_cascade(label="Purchase Management", menu=purchase_menu)
+    purchase_menu.add_command(label="Sale Information", command=add_sales_info)
+    purchase_menu.add_separator()
+    purchase_menu.add_command(label="Upload Purchase Data", command=add_purchase)
+    # purchase_menu.add_command(label="Upload Purchase Invoices", command=show_invoices)
 
-    entry_menu.add_command(label="Sale Info", command=show_sales)
-    entry_menu.add_command(label="Party Info", command=show_party)
-    entry_menu.add_separator()
-    entry_menu.add_command(label="Exit", command=root.quit)
+    # Create Sales Menu
+    sales_menu = tk.Menu(menu_bar, tearoff=0)
+    menu_bar.add_cascade(label="Sales Management", menu=sales_menu)
+    sales_menu.add_command(label="Lots Distribution", command=do_distribution)
+    sales_menu.add_separator()
+    sales_menu.add_command(label="Party-wise Sales", command=party_sales)
+    # sales_menu.add_command(label="Upload Sales Invoices", command=show_bills)
 
-    # Create Data Menu
-    data_menu = tk.Menu(menu_bar, tearoff=0)
-    menu_bar.add_cascade(label="Data", menu=data_menu)
-
-    data_menu.add_command(label="Upload Data", command=show_purchase)
-    data_menu.add_command(label="Distribution", command=show_distribution)
-    data_menu.add_separator()
-    data_menu.add_command(label="Create PDF", command=pdf_generate)
+    # Create Mangement Menu
+    manage_menu = tk.Menu(menu_bar, tearoff=0)
+    menu_bar.add_cascade(label="Management", menu=manage_menu)
+    manage_menu.add_command(label="Party Info", command=show_party)
+    manage_menu.add_separator()
+    manage_menu.add_command(label="Exit", command=root.quit)
 
 if __name__ == "__main__":
     root = tk.Tk()

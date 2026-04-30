@@ -117,10 +117,10 @@ class PurchaseApp:
 
 
         self.tree_buyer_summary = ttk.Treeview(frame_buyer_summary, columns=(
-            "BuyerCode", "Qty", "Kgs"), show="headings")
-        for col in ("BuyerCode", "Qty", "Kgs"):
+            "BuyerCode", "Qty", "Kgs", "Avg. Amt.", "Tot. Amt"), show="headings")
+        for col in ("BuyerCode", "Qty", "Kgs", "Avg. Amt.", "Tot. Amt"):
             self.tree_buyer_summary.heading(col, text=col)
-            self.tree_buyer_summary.column(col, anchor=tk.CENTER, width=int(1000/3))
+            self.tree_buyer_summary.column(col, anchor=tk.CENTER, width=int(1000/5))
         self.tree_buyer_summary.pack(fill='both', expand=True)
 
     def refresh_purchases_list(self):
@@ -145,7 +145,9 @@ class PurchaseApp:
             for buyer in buyer_codes:
                 self.tree_buyer_summary.insert("", "end", values=[buyer,
                     self.cursor.execute("SELECT SUM(BoughtQty) FROM purchases WHERE BuyerCode=?", buyer).fetchone()[0],
-                    self.cursor.execute("SELECT SUM(TotalWt) FROM purchases WHERE BuyerCode=?", buyer).fetchone()[0]])
+                    self.cursor.execute("SELECT SUM(TotalWt) FROM purchases WHERE BuyerCode=?", buyer).fetchone()[0],
+                    self.cursor.execute("SELECT SUM(TotalWt*PriceKg)/SUM(TotalWt) FROM purchases WHERE BuyerCode=?", buyer).fetchone()[0],
+                    self.cursor.execute("SELECT SUM(TotalWt*PriceKg) FROM purchases WHERE BuyerCode=?", buyer).fetchone()[0]])
 
         except sqlite3.Error as e:
             messagebox.showerror("Database Error", f"Error fetching purchases: {e}")
@@ -158,7 +160,7 @@ class PurchaseApp:
         if filepath:
             try:
                 temp_df = read_xml(filepath)
-                select_col = ['BuyersWithinAddressCode', 'LotNo', 'Invoice No', 'Mark',
+                select_col = ['BuyersExportAddressCode', 'LotNo', 'Invoice No', 'Mark',
                               'Grade', 'Qty (Pkgs)', 'Packages Wt/Pkg', 'Total NtWt', 'Price/Kg']
                 try:
                     temp_df = temp_df[select_col]
