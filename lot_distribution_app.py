@@ -51,23 +51,23 @@ def menu():
 
     # Create Purchase Menu
     purchase_menu = tk.Menu(menu_bar, tearoff=0)
-    menu_bar.add_cascade(label="Purchase Management", menu=purchase_menu)
+    menu_bar.add_cascade(label="Purchase", menu=purchase_menu)
     purchase_menu.add_command(label="Sale Information", command=add_sales_info)
     purchase_menu.add_separator()
-    purchase_menu.add_command(label="Upload Purchase Data", command=add_purchase)
+    purchase_menu.add_command(label="Upload Data", command=add_purchase)
     # purchase_menu.add_command(label="Upload Purchase Invoices", command=show_invoices)
 
     # Create Sales Menu
     sales_menu = tk.Menu(menu_bar, tearoff=0)
-    menu_bar.add_cascade(label="Sales Management", menu=sales_menu)
-    sales_menu.add_command(label="Lots Distribution", command=do_distribution)
+    menu_bar.add_cascade(label="Sales", menu=sales_menu)
+    sales_menu.add_command(label="Distribution", command=do_distribution)
     sales_menu.add_separator()
     sales_menu.add_command(label="Party-wise Sales", command=party_sales)
     # sales_menu.add_command(label="Upload Sales Invoices", command=show_bills)
 
     # Create Mangement Menu
     manage_menu = tk.Menu(menu_bar, tearoff=0)
-    menu_bar.add_cascade(label="Management", menu=manage_menu)
+    menu_bar.add_cascade(label="Miscellaneous", menu=manage_menu)
     manage_menu.add_command(label="Party Info", command=show_party)
     manage_menu.add_separator()
     manage_menu.add_command(label="Exit", command=root.quit)
